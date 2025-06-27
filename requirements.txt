@@ -1,0 +1,3 @@
+# --- START OF FILE requirements.txt ---
+pygame
+# --- END OF FILE requirements.txt ---
