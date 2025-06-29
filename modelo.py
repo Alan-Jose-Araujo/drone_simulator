@@ -96,6 +96,7 @@ class Mission:
         self.end_time = None
         self.status = "Não iniciada"
         self.initial_battery = drone.battery
+        self.final_battery = None
 
     def start(self):
         self.start_time = time.time()
@@ -112,6 +113,7 @@ class Mission:
     def end(self):
         self.end_time = time.time()
         self.status = f"Concluída"
+        self.final_battery = self.drone.battery
         if self.drone.payload_status: # Se era entrega, solta o pacote no final
             self.drone.payload_status = False
         if self.drone.camera_status: # Desliga a camera no final
@@ -119,7 +121,7 @@ class Mission:
         
     def calculate_statistics(self):
         """Calcula as estatísticas da missão a partir dos dados na lista encadeada."""
-        if len(self.flight_path) < 2:
+        if len(self.flight_path) < 2 or self.final_battery is None:
             return {}
 
         total_distance = 0
@@ -138,7 +140,7 @@ class Mission:
             total_population += point.environment['population_density']
 
         mission_duration = self.end_time - self.start_time
-        battery_consumed = self.initial_battery - self.drone.battery
+        battery_consumed = self.initial_battery - self.final_battery
         energy_efficiency = battery_consumed / total_distance if total_distance > 0 else 0
 
         # Área coberta por vegetação: Simplificado como a média do percentual nas áreas sobrevoadas
