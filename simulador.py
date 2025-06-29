@@ -155,6 +155,8 @@ class Simulator:
                     if event.key == pygame.K_m:
                         self.history_selected_index = len(self.completed_missions) - 1 if not self.completed_missions.is_empty() else 0
                         self.game_state = "HISTORY"
+                    if event.key == pygame.K_h:
+                        self.game_state = "HELP"
                     if event.key == pygame.K_RETURN: self.start_simulation()
             
             elif self.game_state == "STATS":
@@ -171,6 +173,12 @@ class Simulator:
                             self.history_selected_index = max(0, self.history_selected_index - 1)
                         elif event.key == pygame.K_DOWN:
                             self.history_selected_index = min(len(self.completed_missions) - 1, self.history_selected_index + 1)
+
+            elif self.game_state == "HELP":
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        self.game_state = "MENU"
+
 
     def update(self):
         """Atualiza a lógica do jogo (ex: movimento automático do drone)."""
@@ -289,6 +297,7 @@ class Simulator:
         self.draw_text(f"   [E] Vigilância {'<' if self.mission_type == 'Vigilância' else ''}", self.FONT_S, self.COLORS['ui_text'], self.SCREEN_WIDTH/2 - 150, y_pos); y_pos += 80
         
         self.draw_text("Pressione ENTER para INICIAR", self.FONT_M, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 30
+        self.draw_text("Pressione [H] para ver o menu de ajuda", self.FONT_M, self.COLORS['ui_text'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 30
         self.draw_text("Pressione [M] para ver o Histórico", self.FONT_M, self.COLORS['ui_text'], self.SCREEN_WIDTH/2, y_pos, center=True)
 
     def draw_history(self):
@@ -337,6 +346,24 @@ class Simulator:
                 self.draw_text(f"{key}: {val}", self.FONT_M, (220, 220, 220), stats_x, stats_y)
                 stats_y += 35
 
+    def draw_help(self):
+        self.screen.fill(self.COLORS['background'])
+        y_pos = 100
+        self.draw_text("DURANTE O JOGO: (Manual)", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 60
+        self.draw_text("    Seta para esquerda: Move o drone para a esquerda.", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 25
+        self.draw_text("    Seta para direita: Move o drone para a direita.", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 25
+        self.draw_text("    Seta para cima: Move o drone para a direita.", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 25
+        self.draw_text("    Seta para baixo: Move o drone para a direita.", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 25
+        self.draw_text("    C: Ativa a câmera.", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 25
+        self.draw_text("    P: Captura uma foto.", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 25
+        self.draw_text("    ESC: Finaliza a missão.", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 80
+
+        self.draw_text("DURANTE O JOGO: (Automático)", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 60
+        self.draw_text("    ESC: Finaliza a missão.", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 80
+
+        self.draw_text("Pressione ESC para voltar.", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 60
+
+
     def draw_stats(self):
         self.screen.fill(self.COLORS['background'])
         last_mission = list(self.completed_missions)[-1]
@@ -373,6 +400,8 @@ class Simulator:
             self.draw_stats()
         elif self.game_state == "HISTORY":
             self.draw_history()
+        elif self.game_state == "HELP":
+            self.draw_help()
             
         pygame.display.flip()
         
