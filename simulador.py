@@ -131,6 +131,11 @@ class Simulator:
                     if event.key == pygame.K_ESCAPE:
                         self.end_simulation()
             
+            elif self.game_state == "SIMULATING" and self.simulation_mode == "Automatico":
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        self.end_simulation()
+
             elif self.game_state == "MENU":
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_1: self.simulation_mode = "Manual"
