@@ -2,10 +2,12 @@
 
 import pygame
 import random
+import time
 # Importa as classes do nosso módulo de modelo
 from modelo import MapCell, Drone, Mission
 # Importa a estrutura de dados para o histórico de missões
 from estruturas import LinkedList
+from gerenciador_dados import save_missions, load_missions
 
 # =============================================================================
 # CLASSE PRINCIPAL DA SIMULAÇÃO (CONTROLADOR E VISÃO)
@@ -51,12 +53,17 @@ class Simulator:
         self.map_grid = [[MapCell() for _ in range(self.GRID_WIDTH)] for _ in range(self.GRID_HEIGHT)]
         self.drone = Drone(self.GRID_WIDTH // 2, self.GRID_HEIGHT // 2)
         self.current_mission = None
-        self.completed_missions = LinkedList()
+        self.HISTORY_FILE = "missions_history.json"
+        # self.completed_missions = LinkedList()
+        self.completed_missions = load_missions(self.HISTORY_FILE)
         
         # Para modo automático
         self.auto_path = []
         self.auto_path_index = 0
         self.last_auto_move_time = 0
+
+        self.history_selected_index = 0
+        self.history_scroll_offset = 0
         
     def generate_auto_path(self):
         """Gera um caminho simples (varredura) para o modo automático."""
@@ -92,6 +99,8 @@ class Simulator:
         if self.current_mission:
             self.current_mission.end()
             self.completed_missions.append(self.current_mission)
+            save_missions(self.completed_missions, self.HISTORY_FILE)
+            self.current_mission = None
             self.current_mission = None
         self.game_state = "STATS"
 
@@ -143,12 +152,33 @@ class Simulator:
                     if event.key == pygame.K_q: self.mission_type = "Monitoramento"
                     if event.key == pygame.K_w: self.mission_type = "Entrega"
                     if event.key == pygame.K_e: self.mission_type = "Vigilância"
+                    if event.key == pygame.K_m:
+                        self.history_selected_index = len(self.completed_missions) - 1 if not self.completed_missions.is_empty() else 0
+                        self.game_state = "HISTORY"
+                    if event.key == pygame.K_h:
+                        self.game_state = "HELP"
                     if event.key == pygame.K_RETURN: self.start_simulation()
             
             elif self.game_state == "STATS":
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN or event.key == pygame.K_ESCAPE:
                         self.game_state = "MENU"
+
+            elif self.game_state == "HISTORY":
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        self.game_state = "MENU"
+                    if not self.completed_missions.is_empty():
+                        if event.key == pygame.K_UP:
+                            self.history_selected_index = max(0, self.history_selected_index - 1)
+                        elif event.key == pygame.K_DOWN:
+                            self.history_selected_index = min(len(self.completed_missions) - 1, self.history_selected_index + 1)
+
+            elif self.game_state == "HELP":
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        self.game_state = "MENU"
+
 
     def update(self):
         """Atualiza a lógica do jogo (ex: movimento automático do drone)."""
@@ -265,8 +295,74 @@ class Simulator:
         self.draw_text(f"   [Q] Monitoramento Ambiental {'<' if self.mission_type == 'Monitoramento' else ''}", self.FONT_S, self.COLORS['ui_text'], self.SCREEN_WIDTH/2 - 150, y_pos); y_pos += 25
         self.draw_text(f"   [W] Entrega de Pacotes {'<' if self.mission_type == 'Entrega' else ''}", self.FONT_S, self.COLORS['ui_text'], self.SCREEN_WIDTH/2 - 150, y_pos); y_pos += 25
         self.draw_text(f"   [E] Vigilância {'<' if self.mission_type == 'Vigilância' else ''}", self.FONT_S, self.COLORS['ui_text'], self.SCREEN_WIDTH/2 - 150, y_pos); y_pos += 80
+        
+        self.draw_text("Pressione ENTER para INICIAR", self.FONT_M, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 30
+        self.draw_text("Pressione [H] para ver o menu de ajuda", self.FONT_M, self.COLORS['ui_text'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 30
+        self.draw_text("Pressione [M] para ver o Histórico", self.FONT_M, self.COLORS['ui_text'], self.SCREEN_WIDTH/2, y_pos, center=True)
 
-        self.draw_text("Pressione ENTER para INICIAR", self.FONT_M, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True)
+    def draw_history(self):
+        self.screen.fill(self.COLORS['background'])
+        missions_list = list(self.completed_missions)
+        # Invertemos para mostrar as mais recentes primeiro
+        missions_list.reverse()
+
+        y_pos = 50
+        self.draw_text("HISTÓRICO DE MISSÕES", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True)
+        y_pos += 50
+        self.draw_text("Use as setas CIMA/BAIXO para navegar. Pressione ESC para voltar.", self.FONT_S, (200, 200, 200), self.SCREEN_WIDTH/2, y_pos, center=True)
+        y_pos += 50
+        
+        if not missions_list:
+            self.draw_text("Nenhuma missão no histórico.", self.FONT_M, self.COLORS['ui_text'], self.SCREEN_WIDTH/2, y_pos, center=True)
+            return
+
+        # Painel esquerdo: Lista de Missões
+        list_x = 50
+        list_y = y_pos
+        self.draw_text("Missões Concluídas:", self.FONT_M, self.COLORS['ui_text'], list_x, list_y); list_y += 30
+        
+        for i, mission in enumerate(missions_list):
+            date_str = time.strftime('%d/%m/%Y %H:%M', time.localtime(mission.start_time))
+            entry_text = f"{mission.mission_type} - {date_str}"
+            color = self.COLORS['drone'] if i == self.history_selected_index else self.COLORS['ui_text']
+            self.draw_text(entry_text, self.FONT_S, color, list_x + (20 if i == self.history_selected_index else 10), list_y)
+            list_y += 25
+            if list_y > self.SCREEN_HEIGHT - 50: # Limita o número de missões exibidas
+                self.draw_text("...", self.FONT_S, self.COLORS['ui_text'], list_x + 10, list_y)
+                break
+        
+        # Painel direito: Estatísticas da Missão Selecionada
+        stats_x = self.SCREEN_WIDTH/2 + 50
+        stats_y = y_pos
+        selected_mission = missions_list[self.history_selected_index]
+        stats = selected_mission.calculate_statistics()
+
+        self.draw_text("Detalhes da Missão:", self.FONT_M, self.COLORS['ui_text'], stats_x, stats_y); stats_y += 30
+        
+        if not stats:
+            self.draw_text("Dados insuficientes.", self.FONT_S, (255,100,100), stats_x, stats_y)
+        else:
+            for key, val in stats.items():
+                self.draw_text(f"{key}: {val}", self.FONT_M, (220, 220, 220), stats_x, stats_y)
+                stats_y += 35
+
+    def draw_help(self):
+        self.screen.fill(self.COLORS['background'])
+        y_pos = 100
+        self.draw_text("DURANTE O JOGO: (Manual)", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 60
+        self.draw_text("    Seta para esquerda: Move o drone para a esquerda.", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 25
+        self.draw_text("    Seta para direita: Move o drone para a direita.", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 25
+        self.draw_text("    Seta para cima: Move o drone para a direita.", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 25
+        self.draw_text("    Seta para baixo: Move o drone para a direita.", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 25
+        self.draw_text("    C: Ativa a câmera.", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 25
+        self.draw_text("    P: Captura uma foto.", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 25
+        self.draw_text("    ESC: Finaliza a missão.", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 80
+
+        self.draw_text("DURANTE O JOGO: (Automático)", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 60
+        self.draw_text("    ESC: Finaliza a missão.", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 80
+
+        self.draw_text("Pressione ESC para voltar.", self.FONT_L, self.COLORS['drone'], self.SCREEN_WIDTH/2, y_pos, center=True); y_pos += 60
+
 
     def draw_stats(self):
         self.screen.fill(self.COLORS['background'])
@@ -302,6 +398,10 @@ class Simulator:
             self.draw_menu()
         elif self.game_state == "STATS":
             self.draw_stats()
+        elif self.game_state == "HISTORY":
+            self.draw_history()
+        elif self.game_state == "HELP":
+            self.draw_help()
             
         pygame.display.flip()
         
